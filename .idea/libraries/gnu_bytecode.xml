@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="gnu.bytecode">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/../gnu.bytecode.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
