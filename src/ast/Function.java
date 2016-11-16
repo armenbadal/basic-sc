@@ -12,34 +12,50 @@ import java.util.List;
 
 public class Function {
     public String name = null;
-    public List<Variable> parameters = null;
+    public List<Variable> params = null;
     public char rtype = 'V';
     public Node body = null;
-    
+
+    public List<Variable> locals = null;
+
     //
     public Function( String nm, List<Variable> prs )
     {
         name = nm;
-        parameters = new ArrayList<>();
-        parameters.addAll(prs);
+        params = new ArrayList<>();
+        params.addAll(prs);
+
+        locals = new ArrayList<>();
     }
 
     //    
     public void compile( ClassType clo )
     {
-        int parc = parameters.size();
-        
+        int parc = params.size();
+
+        // պարամետրերի տիպերը
         Type[] partyp = new Type[parc];
-        for( int i = 0; i < parc; ++i )
-            partyp[i] = Type.doubleType;
-        
-        Type rty = rtype == 'R' ? Type.doubleType : Type.voidType;
+        for( int i = 0; i < parc; ++i ) {
+            char tyn = params.get(i).type;
+            if( tyn == 'R' )
+                partyp[i] = Type.doubleType;
+            else if( tyn == 'T' )
+                partyp[i] = Type.javalangStringType;
+        }
+
+        // վերադարձվող արժեքի տիպը
+        Type rty = Type.voidType;
+        if( rtype == 'R' )
+            rty = Type.doubleType;
+        else if( rtype == 'T' )
+            rty = Type.voidType;
+
         final int pust = Access.PUBLIC | Access.STATIC;
         Method subr = clo.addMethod(name, partyp, rty, pust);
         
         CodeAttr code = subr.startCode();
         for( int i = 0; i < parc; ++i ) {
-            String pna = parameters.get(i).name;
+            String pna = params.get(i).name;
             code.getArg(i).setName(pna);
         }
         

@@ -14,6 +14,7 @@ public class Text extends Node {
 
     @Override
     public void compile( CodeAttr code )
-    {        
+    {
+        code.emitPushString(value);
     }
 }

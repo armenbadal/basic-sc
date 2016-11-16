@@ -16,12 +16,9 @@ public class Variable extends Node {
         }
     }
     
-    public Variable( String vn, Node ix )
-    {
-    }
-        
     @Override
     public void compile( CodeAttr code )
-    {        
+    {
+        code.emitLoad(code.lookup(name));
     }
 }

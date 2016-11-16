@@ -130,6 +130,9 @@ public class Scanner {
             case ',':
                 kind = Token.Comma;
                 break;
+            case '&':
+                kind = Token.Concat;
+                break;
         }
 
         return new Lexeme(kind, String.valueOf(ch), line);

@@ -12,7 +12,7 @@ public class Parser {
     private Lexeme lookahead = null;
 
     private List<Function> subroutines = null;
-    private SymbolTable symbols = null;
+    private List<Variable> scopelocals = null;
 
     public Parser( String text )
     {
@@ -26,7 +26,6 @@ public class Parser {
     public List<Function> parse() throws ParseError, TypeError
     {
         subroutines = new ArrayList<>();
-        symbols = new SymbolTable();
 
         while( lookahead.is(Token.Declare, Token.Function) ) {
             Function subri = null;
@@ -88,17 +87,20 @@ public class Parser {
     private Function parseFunction() throws ParseError, TypeError
     {
         Function subr = parseFuncHeader();
-        addSubroutine(subr);
+        addSubroutine(subr); // ?
         final String name = subr.name;
         subr = subroutines.stream()
                 .filter(e -> e.name.equals(name))
                 .findFirst()
                 .get();
+        scopelocals = new ArrayList<>(); // reset symbol table
+        // TODO add function parameters to scopelocals (?)
         subr.body = parseNodeList();
         match(Token.End);
         match(Token.Function);
         parseNewLines();
 
+        // TODO add content of symbol table to Function locals
         return subr;
     }
 
@@ -106,8 +108,8 @@ public class Parser {
     {
         Sequence seq = new Sequence();
         // FIRST(Node)
-        while( lookahead.is(Token.Identifier, Token.Input, Token.Print, Token.If,
-                Token.For, Token.While, Token.Call, Token.Dim, Token.Let) ) {
+        while( lookahead.is(Token.Identifier, Token.Input, Token.Print,
+                Token.If, Token.For, Token.While, Token.Call, Token.Let) ) {
             Node sti = parseNode();
             seq.add(sti);
         }
@@ -141,9 +143,6 @@ public class Parser {
             case Call:
                 stat = parseCallSub();
                 break;
-            case Dim:
-                stat = parseDim();
-                break;
         }
         parseNewLines();
 
@@ -156,19 +155,16 @@ public class Parser {
             match(Token.Let);
         String varl = lookahead.value;
         match(Token.Identifier);
-        // երբ  վերագրվում է զանգվածի տարրին
-        Node einx = null;
-        if( lookahead.is(Token.LeftParen) ) {
-            match(Token.LeftParen);
-            einx = parseDisjunction();
-            match(Token.RightParen);
-        }
         match(Token.Eq);
         Node exl = parseDisjunction();
 
-        // TODO նոր անուն ավելացնել symbols-ում
-        // TODO ստուգել փոփխականի տիպը
-        return new Let(new Variable(varl, einx), exl);
+        Variable vr = new Variable(varl);
+        // TODO նոր անուն ավելացնել current-ի locals-ում
+        for( Variable v : scopelocals )
+            if( v.name.equals(vr.name) && v.type == vr.type )
+                break;
+        // TODO ստուգել փոփոխականի տիպը
+        return new Let(vr, exl);
     }
 
     private Node parseInput() throws ParseError, TypeError
@@ -276,27 +272,11 @@ public class Parser {
                 .filter(e -> e.name.equals(subnam))
                 .findFirst().get();
 
-        if( func.parameters.size() != argus.size() )
+        if( func.params.size() != argus.size() )
             throw new ParseError("%s ֆունկցիան սպասում է %d պարամետրեր։",
-                    subnam, func.parameters.size());
+                    subnam, func.params.size());
 
         return new Call(func, argus);
-    }
-
-    private Node parseDim() throws ParseError
-    {
-        match(Token.Dim);
-        String name = lookahead.value;
-        match(Token.Identifier);
-        match(Token.LeftParen);
-        String strsz = lookahead.value;
-        match(Token.Number);
-        match(Token.RightParen);
-
-        Variable var = new Variable(name);
-        double size = Double.valueOf(strsz);
-        //symbols.put(name, "ARRAY"); // ?
-        return new Dim(var, (int)size);
     }
 
     private void parseNewLines() throws ParseError, TypeError
@@ -335,6 +315,8 @@ public class Parser {
             String oper = lookahead.value;
             lookahead = scan.next();
             Node exi = parseComparison();
+            if( exo.type != exi.type )
+                throw new TypeError("Տիպի սխալ։");
             exo = new Binary(oper, exo, exi);
         }
         return exo;
@@ -347,6 +329,8 @@ public class Parser {
             String oper = lookahead.value;
             lookahead = scan.next();
             Node exi = parseAddition();
+            if( exo.type != exi.type ) // TODO maybe allow for Real only
+                throw new TypeError("Տիպի սխալ։");
             exo = new Binary(oper, exo, exi);
         }
         return exo;
@@ -359,6 +343,8 @@ public class Parser {
             String oper = lookahead.value;
             lookahead = scan.next();
             Node exi = parseMultiplication();
+            if( exo.type != 'R' || exi.type != 'R' )
+                throw new TypeError("Տիպի սխալ։");
             exo = new Binary(oper, exo, exi);
         }
         return exo;
@@ -371,6 +357,8 @@ public class Parser {
             String oper = lookahead.value;
             lookahead = scan.next();
             Node exi = parsePower();
+            if( exo.type != 'R' || exi.type != 'R' )
+                throw new TypeError("Տիպի սխալ։");
             exo = new Binary(oper, exo, exi);
         }
         return exo;
@@ -382,6 +370,8 @@ public class Parser {
         if( lookahead.is(Token.Power) ) {
             match(Token.Power);
             Node exi = parsePower();
+            if( exo.type != 'R' || exi.type != 'R' )
+                throw new TypeError("Տիպի սխալ։");
             exo = new Binary("^", exo, exi);
         }
         return exo;
@@ -425,9 +415,9 @@ public class Parser {
                         .filter(e -> e.name.equals(varnam))
                         .findFirst().get();
                 // համեմատել ֆունկցիայի պարամետրերի և փոխանցված արգումենտների քանակը
-                if( func.parameters.size() != argus.size() )
+                if( func.params.size() != argus.size() )
                     throw new ParseError("%s ֆունկցիան սպասում է %d պարամետրեր։",
-                            varnam, func.parameters.size());
+                            varnam, func.params.size());
                 result = new Apply(func, argus);
             }
             else
@@ -437,6 +427,8 @@ public class Parser {
             String oper = lookahead.value;
             lookahead = scan.next();
             Node subex = parseFactor();
+            if( subex.type != 'R' )
+                throw new TypeError("Տիպի սխալ։");
             result = new Unary(oper, subex);
         }
         else if( lookahead.is(Token.LeftParen) ) {

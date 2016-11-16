@@ -45,6 +45,7 @@ public enum Token {
     Mul,
     Div,
     Power,
+    Concat,
 
     NewLine,
 

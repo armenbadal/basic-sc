@@ -2,6 +2,7 @@
 package ast;
 
 import gnu.bytecode.CodeAttr;
+import parser.TypeError;
 
 public class Unary extends Node {
     private String operation = null;
@@ -11,13 +12,11 @@ public class Unary extends Node {
     {
         operation = op;
         subexpr = se;
-        
-        if( subexpr.type != 'R' )
-            throw new TypeError("Տիպի սխալ։");
         type = 'R';
     }
  
     @Override
     public void compile( CodeAttr code )
-    {}
+    {
+    }
 }

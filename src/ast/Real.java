@@ -14,5 +14,7 @@ public class Real extends Node {
 
     @Override
     public void compile( CodeAttr code ) 
-    {}
+    {
+        code.emitPushDouble(value);
+    }
 }
