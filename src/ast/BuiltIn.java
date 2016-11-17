@@ -10,7 +10,9 @@ public class BuiltIn extends Node {
     
     public static boolean is( String nm )
     {
-        return true;
+        if( nm.equals("SQR") )
+            return true;
+        return false;
     }
 
     @Override

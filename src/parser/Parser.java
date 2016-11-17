@@ -12,7 +12,7 @@ public class Parser {
     private Lexeme lookahead = null;
 
     private List<Function> subroutines = null;
-    private List<Variable> scopelocals = null;
+    private Function current = null;
 
     public Parser( String text )
     {
@@ -81,7 +81,8 @@ public class Parser {
         match(Token.RightParen);
         parseNewLines();
 
-        return new Function(name, params);
+        current = new Function(name, params);
+        return current;
     }
 
     private Function parseFunction() throws ParseError, TypeError
@@ -93,7 +94,6 @@ public class Parser {
                 .filter(e -> e.name.equals(name))
                 .findFirst()
                 .get();
-        scopelocals = new ArrayList<>(); // reset symbol table
         // TODO add function parameters to scopelocals (?)
         subr.body = parseNodeList();
         match(Token.End);
@@ -160,9 +160,6 @@ public class Parser {
 
         Variable vr = new Variable(varl);
         // TODO նոր անուն ավելացնել current-ի locals-ում
-        for( Variable v : scopelocals )
-            if( v.name.equals(vr.name) && v.type == vr.type )
-                break;
         // TODO ստուգել փոփոխականի տիպը
         return new Let(vr, exl);
     }
