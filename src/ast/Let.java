@@ -21,5 +21,8 @@ public class Let extends Node {
     
     @Override
     public void compile( CodeAttr code )
-    {}
+    {
+        valu.compile(code);
+        code.emitStore(code.lookup(vari.name));
+    }
 }
