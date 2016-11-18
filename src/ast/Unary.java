@@ -12,7 +12,11 @@ public class Unary extends Node {
     {
         operation = op;
         subexpr = se;
-        type = 'R';
+
+        if( operation.equals("NOT") )
+            type = Node.Boolean;
+        else if( operation.equals("-") )
+            type = Node.Real;
     }
  
     @Override

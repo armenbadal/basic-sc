@@ -22,7 +22,8 @@ public class Program {
     
     public void add( Function sub )
     {
-        subroutines.add(sub);
+        if( !subroutines.contains(sub) )
+            subroutines.add(sub);
     }
     
     public void compile() throws IOException

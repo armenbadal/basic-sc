@@ -16,16 +16,49 @@ public class Function {
     public char rtype = 'V';
     public Node body = null;
 
-    public List<Variable> locals = null;
+    private List<Variable> locals = null;
 
     //
     public Function( String nm, List<Variable> prs )
     {
         name = nm;
-        params = new ArrayList<>();
-        params.addAll(prs);
+        params = prs;
 
         locals = new ArrayList<>();
+    }
+
+    //
+    public void addLocal( Variable vr )
+    {
+        locals.add(vr);
+    }
+
+    //
+    public boolean isParameter( Variable vr )
+    {
+        return params.contains(vr);
+    }
+    //
+    public boolean isLocal( Variable vr )
+    {
+        return locals.contains(vr);
+    }
+
+    @Override
+    public boolean equals( Object oj )
+    {
+        if (!(oj instanceof Function))
+            return false;
+
+        Function of = (Function) oj;
+        if (!of.name.equals(name))
+            return false;
+        if (of.params.size() != params.size())
+            return false;
+
+        // TODO ստուգել նաև պարամետրերի անունները և տիպերը
+
+        return true;
     }
 
     //    

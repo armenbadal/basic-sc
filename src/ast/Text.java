@@ -8,7 +8,7 @@ public class Text extends Node {
     
     public Text( String vl )
     {
-        type = 'T';
+        type = Node.Text;
         value = vl;
     }
 

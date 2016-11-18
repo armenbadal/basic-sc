@@ -8,7 +8,7 @@ public class Real extends Node {
     
     public Real( double vl )
     {
-        type = 'R';
+        type = Node.Real;
         value = vl;
     }
 

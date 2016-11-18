@@ -3,27 +3,48 @@ package parser;
 
 import ast.*;
 
+import java.io.BufferedReader;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**/
 public class Parser {
+    // բառային վերլուծիչը
     private Scanner scan = null;
+    // ընտրության սիմվոլ
     private Lexeme lookahead = null;
 
+    // վերլուծվող ֆայլի անունը
+    private String fileName = null;
+    // հայտարարված ու սահմանված ենթածրագրերը
     private List<Function> subroutines = null;
+    // վերլուծվող ենթածրագրի հղումը
     private Function current = null;
 
-    public Parser( String text )
+    //
+    public Parser( String name ) throws IOException
     {
-        scan = new Scanner(text + "@");
+        fileName = name;
+
+        StringBuilder texter = new StringBuilder();
+        try( BufferedReader read = new BufferedReader(new FileReader(fileName)) ) {
+            read.lines().forEach(e -> texter.append(e).append("\n"));
+        }
+        texter.append('@');
+
+        scan = new Scanner(texter.toString());
         lookahead = scan.next();
         // բաց թողնել ֆայլի սկզբի դատարկ տողերը
         while( lookahead.is(Token.NewLine) )
             lookahead = scan.next();
     }
 
-    public List<Function> parse() throws ParseError, TypeError
+    //
+    public Program parse() throws ParseError, TypeError
     {
         subroutines = new ArrayList<>();
 
@@ -33,25 +54,27 @@ public class Parser {
                 subri = parseDeclare();
             else if( lookahead.is(Token.Function) )
                 subri = parseFunction();
-            if( subri != null )
-                addSubroutine(subri);
+
+            if( subri != null ) {
+                if( !subroutines.contains(subri) )
+                    subroutines.add(subri);
+            }
         }
 
-        return subroutines;
+        String outname = fileName.replace(".bas", ".class");
+        Program result = new Program(outname);
+        subroutines.forEach(e -> result.add(e));
+        return result;
     }
 
-    private void addSubroutine( Function su )
-    {
-        if( !subroutines.contains(su) )
-            subroutines.add(su);
-    }
-
+    //
     private Function parseDeclare() throws ParseError, TypeError
     {
         match(Token.Declare);
         return parseFuncHeader();
     }
 
+    //
     private Function parseFuncHeader() throws ParseError, TypeError
     {
         match(Token.Function);
@@ -85,25 +108,31 @@ public class Parser {
         return current;
     }
 
+    //
     private Function parseFunction() throws ParseError, TypeError
     {
+        // վերլուծել վերնագիրը
         Function subr = parseFuncHeader();
-        addSubroutine(subr); // ?
+        if( !subroutines.contains(subr) ) // ?
+            subroutines.add(subr);        // ?
+
+        // ենթածրագիր ցուցիչը
         final String name = subr.name;
-        subr = subroutines.stream()
+        Optional<Function> optsub = subroutines.stream()
                 .filter(e -> e.name.equals(name))
-                .findFirst()
-                .get();
-        // TODO add function parameters to scopelocals (?)
+                .findFirst();
+        if( optsub.isPresent() )
+            subr = optsub.get();
+
         subr.body = parseNodeList();
         match(Token.End);
         match(Token.Function);
         parseNewLines();
 
-        // TODO add content of symbol table to Function locals
         return subr;
     }
 
+    //
     private Node parseNodeList() throws ParseError, TypeError
     {
         Sequence seq = new Sequence();
@@ -117,6 +146,7 @@ public class Parser {
         return seq;
     }
 
+    //
     private Node parseNode() throws ParseError, TypeError
     {
         Node stat = null;
@@ -149,6 +179,7 @@ public class Parser {
         return stat;
     }
 
+    //
     private Node parseLet() throws ParseError, TypeError
     {
         if( lookahead.is(Token.Let) )
@@ -159,20 +190,28 @@ public class Parser {
         Node exl = parseDisjunction();
 
         Variable vr = new Variable(varl);
-        // TODO նոր անուն ավելացնել current-ի locals-ում
-        // TODO ստուգել փոփոխականի տիպը
+        current.addLocal(vr);
+
+        if( vr.type != exl.type )
+            throw new TypeError("Տիպի սխալ։");
+
         return new Let(vr, exl);
     }
 
+    //
     private Node parseInput() throws ParseError, TypeError
     {
         match(Token.Input);
         String varn = lookahead.value;
         match(Token.Identifier);
 
-        return new Input(new Variable(varn));
+        Variable vr = new Variable(varn);
+        current.addLocal(vr);
+
+        return new Input(vr);
     }
 
+    //
     private Node parsePrint() throws ParseError, TypeError
     {
         match(Token.Print);
@@ -181,6 +220,7 @@ public class Parser {
         return new Print(exo);
     }
 
+    //
     private Node parseConditional() throws ParseError, TypeError
     {
         match(Token.If);
@@ -215,21 +255,27 @@ public class Parser {
     private Node parseForLoop() throws ParseError, TypeError
     {
         match(Token.For);
+
         Variable prn = new Variable(lookahead.value);
         match(Token.Identifier);
         if( 'T' == prn.type )
             throw new ParseError("FOR ցիկլի պարամետրը պետք է լինի թվային։");
+        current.addLocal(prn);
         match(Token.Eq);
         Node init = parseDisjunction();
+
         match(Token.To);
         Node lim = parseDisjunction();
+
         Node ste = null;
         if( lookahead.is(Token.Step) ) {
             match(Token.Step);
             ste = parseDisjunction();
         }
         parseNewLines();
+
         Node bdy = parseNodeList();
+
         match(Token.End);
         match(Token.For);
 
@@ -248,12 +294,21 @@ public class Parser {
         return new While(cond, bdy);
     }
 
+    //
     private Node parseCallSub() throws ParseError, TypeError
     {
         match(Token.Call);
         String subnam = lookahead.value;
         match(Token.Identifier);
-        // TODO ստուգել ֆունկցիայի սահմանված կամ հայտարարված լինելը
+
+        // ստուգել ֆունկցիայի սահմանված կամ հայտարարված լինելը
+        Optional<Function> optfunc = subroutines.stream()
+                .filter(e -> e.name.equals(subnam))
+                .findFirst();
+        if( !optfunc.isPresent() )
+            throw new ParseError("Կանչվող պրոցեդուրան սահմանված կամ հայտարարված չէ։");
+
+        // արգումենտները
         ArrayList<Node> argus = new ArrayList<>();
         if( lookahead.is(Token.Number, Token.Identifier, Token.Sub, Token.Not, Token.LeftParen) ) {
             Node exi = parseDisjunction();
@@ -265,10 +320,7 @@ public class Parser {
             }
         }
 
-        Function func = subroutines.stream()
-                .filter(e -> e.name.equals(subnam))
-                .findFirst().get();
-
+        Function func = optfunc.get();
         if( func.params.size() != argus.size() )
             throw new ParseError("%s ֆունկցիան սպասում է %d պարամետրեր։",
                     subnam, func.params.size());
@@ -276,6 +328,7 @@ public class Parser {
         return new Call(func, argus);
     }
 
+    //
     private void parseNewLines() throws ParseError, TypeError
     {
         match(Token.NewLine);
@@ -326,7 +379,7 @@ public class Parser {
             String oper = lookahead.value;
             lookahead = scan.next();
             Node exi = parseAddition();
-            if( exo.type != exi.type ) // TODO maybe allow for Real only
+            if( exo.type != Node.Real || exi.type != Node.Real )
                 throw new TypeError("Տիպի սխալ։");
             exo = new Binary(oper, exo, exi);
         }
@@ -340,7 +393,7 @@ public class Parser {
             String oper = lookahead.value;
             lookahead = scan.next();
             Node exi = parseMultiplication();
-            if( exo.type != 'R' || exi.type != 'R' )
+            if( exo.type != Node.Real || exi.type != Node.Real )
                 throw new TypeError("Տիպի սխալ։");
             exo = new Binary(oper, exo, exi);
         }
@@ -354,7 +407,7 @@ public class Parser {
             String oper = lookahead.value;
             lookahead = scan.next();
             Node exi = parsePower();
-            if( exo.type != 'R' || exi.type != 'R' )
+            if( exo.type != Node.Real || exi.type != Node.Real )
                 throw new TypeError("Տիպի սխալ։");
             exo = new Binary(oper, exo, exi);
         }
@@ -367,7 +420,7 @@ public class Parser {
         if( lookahead.is(Token.Power) ) {
             match(Token.Power);
             Node exi = parsePower();
-            if( exo.type != 'R' || exi.type != 'R' )
+            if( exo.type != Node.Real || exi.type != Node.Real )
                 throw new TypeError("Տիպի սխալ։");
             exo = new Binary("^", exo, exi);
         }
@@ -408,23 +461,32 @@ public class Parser {
                 if( BuiltIn.is(varnam) )
                     return new BuiltIn(varnam, argus);
                 // գտնել հայտարարված կամ սահմանված ֆունկցիան
-                Function func = subroutines.stream()
+                Optional<Function> optfunc = subroutines.stream()
                         .filter(e -> e.name.equals(varnam))
-                        .findFirst().get();
+                        .findFirst();
+                if( !optfunc.isPresent() )
+                    new ParseError("Կանչված ֆունցկիան սահմանված կամ հայտարարված չէ։");
+                Function func = optfunc.get();
                 // համեմատել ֆունկցիայի պարամետրերի և փոխանցված արգումենտների քանակը
                 if( func.params.size() != argus.size() )
                     throw new ParseError("%s ֆունկցիան սպասում է %d պարամետրեր։",
                             varnam, func.params.size());
-                result = new Apply(func, argus);
+                result = new Apply(func.name, argus);
             }
-            else
-                result = new Variable(varnam);
+            else {
+                Variable var = new Variable(varnam);
+                if( !current.isParameter(var) || !current.isLocal(var) )
+                    throw new ParseError("Օգտագործվող փոփոխականն արժեքավորված չէ։");
+                return var;
+            }
         }
         else if( lookahead.is(Token.Sub, Token.Not) ) {
             String oper = lookahead.value;
             lookahead = scan.next();
             Node subex = parseFactor();
-            if( subex.type != 'R' )
+            if( oper.equals("NOT") && subex.type != Node.Boolean )
+                throw new TypeError("Տիպի սխալ։");
+            if( oper.equals("-") && subex.type != Node.Real )
                 throw new TypeError("Տիպի սխալ։");
             result = new Unary(oper, subex);
         }
