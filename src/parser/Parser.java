@@ -4,7 +4,6 @@ package parser;
 import ast.*;
 
 import java.io.BufferedReader;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -63,7 +62,7 @@ public class Parser {
 
         String outname = fileName.replace(".bas", ".class");
         Program result = new Program(outname);
-        subroutines.forEach(e -> result.add(e));
+        subroutines.forEach(result::add);
         return result;
     }
 
