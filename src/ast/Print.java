@@ -23,12 +23,16 @@ public class Print extends Node {
         ClassType prs = ClassType.make("java.io.PrintStream");
         Type[] aty = new Type[1];
         Method prim = null;
-        if( expr.type == 'R' ) {
+        if( expr.type == Node.Real ) {
             aty[0] = Type.doubleType;
             prim = prs.getDeclaredMethod("println", aty);
         }
-        else if( expr.type == 'T' ) {
+        else if( expr.type == Node.Text ) {
             aty[0] = Type.javalangStringType;
+            prim = prs.getDeclaredMethod("println", aty);
+        }
+        else if( expr.type == Node.Boolean ) {
+            aty[0] = Type.booleanType;
             prim = prs.getDeclaredMethod("println", aty);
         }
         code.emitInvokeVirtual(prim);

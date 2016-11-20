@@ -6,6 +6,7 @@ import ast.*;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -18,19 +19,19 @@ public class Parser {
     private Lexeme lookahead = null;
 
     // վերլուծվող ֆայլի անունը
-    private String fileName = null;
+    private Path pathToFile = null;
     // հայտարարված ու սահմանված ենթածրագրերը
     private List<Function> subroutines = null;
     // վերլուծվող ենթածրագրի հղումը
     private Function current = null;
 
     //
-    public Parser( String name ) throws IOException
+    public Parser( Path path ) throws IOException
     {
-        fileName = name;
+        pathToFile = path;
 
         StringBuilder texter = new StringBuilder();
-        try( BufferedReader read = new BufferedReader(new FileReader(fileName)) ) {
+        try( BufferedReader read = new BufferedReader(new FileReader(pathToFile.toFile())) ) {
             read.lines().forEach(e -> texter.append(e).append("\n"));
         }
         texter.append('@');
@@ -60,8 +61,8 @@ public class Parser {
             }
         }
 
-        String outname = fileName.replace(".bas", ".class");
-        Program result = new Program(outname);
+        String outname = pathToFile.getFileName().toString();
+        Program result = new Program(outname.replace(".bas", ""));
         subroutines.forEach(result::add);
         return result;
     }
@@ -183,12 +184,18 @@ public class Parser {
     {
         if( lookahead.is(Token.Let) )
             match(Token.Let);
-        String varl = lookahead.value;
+        String varn = lookahead.value;
         match(Token.Identifier);
         match(Token.Eq);
         Node exl = parseDisjunction();
 
-        Variable vr = new Variable(varl);
+        // ստուգել, թե արդյոք վերագրվող փոփոխականը ֆունկցիայի անունն է
+        if( current.name.equals(varn) ) {
+            current.rtype = exl.type; // որոշել ֆունկցիայի վերադարձրած արժեքի տիպը
+            varn = "result$" + varn;
+        }
+
+        Variable vr = new Variable(varn);
         current.addLocal(vr);
 
         if( vr.type != exl.type )
@@ -341,7 +348,7 @@ public class Parser {
         while( lookahead.is(Token.Or) ) {
             lookahead = scan.next();
             Node exi = parseConjunction();
-            return new Binary("OR", exo, exi);
+            return new Logical("OR", exo, exi);
         }
         return exo;
     }
@@ -352,7 +359,7 @@ public class Parser {
         while( lookahead.is(Token.And) ) {
             lookahead = scan.next();
             Node exi = parseEquality();
-            return new Binary("AND", exo, exi);
+            return new Logical("AND", exo, exi);
         }
         return exo;
     }
@@ -366,7 +373,7 @@ public class Parser {
             Node exi = parseComparison();
             if( exo.type != exi.type )
                 throw new TypeError("Տիպի սխալ։");
-            exo = new Binary(oper, exo, exi);
+            exo = new Comparison(oper, exo, exi);
         }
         return exo;
     }
@@ -380,7 +387,7 @@ public class Parser {
             Node exi = parseAddition();
             if( exo.type != Node.Real || exi.type != Node.Real )
                 throw new TypeError("Տիպի սխալ։");
-            exo = new Binary(oper, exo, exi);
+            exo = new Comparison(oper, exo, exi);
         }
         return exo;
     }
@@ -394,7 +401,7 @@ public class Parser {
             Node exi = parseMultiplication();
             if( exo.type != Node.Real || exi.type != Node.Real )
                 throw new TypeError("Տիպի սխալ։");
-            exo = new Binary(oper, exo, exi);
+            exo = new Arithmetic(oper, exo, exi);
         }
         return exo;
     }
@@ -408,7 +415,7 @@ public class Parser {
             Node exi = parsePower();
             if( exo.type != Node.Real || exi.type != Node.Real )
                 throw new TypeError("Տիպի սխալ։");
-            exo = new Binary(oper, exo, exi);
+            exo = new Arithmetic(oper, exo, exi);
         }
         return exo;
     }
@@ -421,7 +428,7 @@ public class Parser {
             Node exi = parsePower();
             if( exo.type != Node.Real || exi.type != Node.Real )
                 throw new TypeError("Տիպի սխալ։");
-            exo = new Binary("^", exo, exi);
+            exo = new Arithmetic("^", exo, exi);
         }
         return exo;
     }
@@ -474,8 +481,8 @@ public class Parser {
             }
             else {
                 Variable var = new Variable(varnam);
-                if( !current.isParameter(var) || !current.isLocal(var) )
-                    throw new ParseError("Օգտագործվող փոփոխականն արժեքավորված չէ։");
+                if( !current.isParameter(var) && !current.isLocal(var) )
+                    throw new ParseError("`%s` փոփոխականն արժեքավորված չէ։", var.name);
                 return var;
             }
         }

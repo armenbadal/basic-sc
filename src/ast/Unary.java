@@ -2,6 +2,7 @@
 package ast;
 
 import gnu.bytecode.CodeAttr;
+import gnu.bytecode.Type;
 import parser.TypeError;
 
 public class Unary extends Node {
@@ -22,5 +23,10 @@ public class Unary extends Node {
     @Override
     public void compile( CodeAttr code )
     {
+        subexpr.compile(code);
+        if( operation.equals("-") )
+            code.put1(119); // dneg
+        else if( operation.equals("NOT") )
+            code.emitNot(Type.booleanType);
     }
 }

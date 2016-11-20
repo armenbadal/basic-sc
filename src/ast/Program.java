@@ -67,6 +67,8 @@ public class Program {
             code.emitPutStatic(sc);
         }
 
+        code.emitReturn();
+
         // գրել ֆայլի մեջ
         classobj.writeToFile(name + ".class");
     }

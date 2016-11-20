@@ -25,7 +25,7 @@ public class Apply extends Node {
             a.compile(code);
 
         ClassType clo = code.getMethod().getDeclaringClass();
-        Method meo = clo.getDeclaredMethod(callee, argus.size());
-        code.emitInvokeVirtual(meo);
+        Method meo = clo.getDeclaredStaticMethod(callee, argus.size());
+        code.emitInvokeStatic(meo);
     }
 }

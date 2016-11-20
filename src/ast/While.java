@@ -17,8 +17,8 @@ public class While extends Node {
     @Override
     public void compile( CodeAttr code )
     {
-        Label wb = code.getLabel();
-        Label we = code.getLabel();
+        Label wb = new Label(code);
+        Label we = new Label(code);
 
         wb.define(code);
         condition.compile(code);

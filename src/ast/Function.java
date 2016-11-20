@@ -13,7 +13,7 @@ import java.util.List;
 public class Function {
     public String name = null;
     public List<Variable> params = null;
-    public char rtype = 'V';
+    public char rtype = Node.Void;
     public Node body = null;
 
     private List<Variable> locals = null;
@@ -70,17 +70,19 @@ public class Function {
         Type[] partyp = new Type[parc];
         for( int i = 0; i < parc; ++i ) {
             char tyn = params.get(i).type;
-            if( tyn == 'R' )
+            if( tyn == Node.Real )
                 partyp[i] = Type.doubleType;
-            else if( tyn == 'T' )
+            else if( tyn == Node.Text )
                 partyp[i] = Type.javalangStringType;
         }
 
         // վերադարձվող արժեքի տիպը
         Type rty = Type.voidType;
-        if( rtype == 'R' )
+        if( rtype == Node.Real )
             rty = Type.doubleType;
-        else if( rtype == 'T' )
+        else if( rtype == Node.Text )
+            rty = Type.javalangStringType;
+        else if( rtype == Node.Void )
             rty = Type.voidType;
 
         final int pust = Access.PUBLIC | Access.STATIC;
@@ -91,9 +93,18 @@ public class Function {
             String pna = params.get(i).name;
             code.getArg(i).setName(pna);
         }
+
+        for( Variable v : locals )
+            if( v.type == Node.Real )
+                code.addLocal(Type.doubleType, v.name);
+            else if( v.type == Node.Text )
+                code.addLocal(Type.javalangStringType, v.name);
         
         code.pushScope();
         body.compile(code);
+        if( rtype != Node.Void )
+            code.emitLoad(code.lookup("result$" + name));
+        code.emitReturn();
         code.popScope();
     }
 }

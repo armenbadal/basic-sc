@@ -2,34 +2,30 @@
 package ast;
 
 import gnu.bytecode.CodeAttr;
+import gnu.bytecode.Type;
 import parser.TypeError;
 
-public class Binary extends Node {
+public abstract class Binary extends Node {
     public static final String[] arithmetic
             = { "+", "-", "*", "/", "^" };
     public static final String[] comparison
-            = { "=", "<>", ">", "<=", ">", ">=" };
+            = { "=", "<>", ">", ">=", "<", "<=" };
     public static final String[] logical
             = { "AND", "OR" };
     public static final String[] textual
             = { "&" };
 
-    private String operation = null;
-    private Node expro = null;
-    private Node expri = null;
+    protected String operation = null;
+    protected  Node expro = null;
+    protected Node expri = null;
     
-    public Binary( String op, Node eo, Node ei ) throws TypeError
+    public Binary( String op, Node eo, Node ei )
     {
         operation = op;
         expro = eo;
         expri = ei;
 
-//        if( expro.type == Node.Text && expri.type == Node.Text && operation.equals("&") )
-//            type = Node.Text;
-//        else if( expro.type == Node.Real && expri.type == Node.Real )
-//            type = Node.Real;
-
-        // տիպի դուրսբերում
+        // տիպի որոշում
         if( isIn(operation, arithmetic) )
             type = Node.Real;
         else if( isIn(operation, comparison) )
@@ -49,6 +45,5 @@ public class Binary extends Node {
     }
 
     @Override
-    public void compile( CodeAttr code )
-    {}
+    public abstract void compile( CodeAttr code );
 }
