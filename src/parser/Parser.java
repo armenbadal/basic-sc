@@ -113,16 +113,18 @@ public class Parser {
     {
         // վերլուծել վերնագիրը
         Function subr = parseFuncHeader();
-        if( !subroutines.contains(subr) ) // ?
-            subroutines.add(subr);        // ?
 
         // ենթածրագիր ցուցիչը
         final String name = subr.name;
         Optional<Function> optsub = subroutines.stream()
                 .filter(e -> e.name.equals(name))
                 .findFirst();
-        if( optsub.isPresent() )
+        if( optsub.isPresent() ) {
             subr = optsub.get();
+            current = subr;
+        }
+        else
+            subroutines.add(subr);
 
         subr.body = parseNodeList();
         match(Token.End);
@@ -196,7 +198,8 @@ public class Parser {
         }
 
         Variable vr = new Variable(varn);
-        current.addLocal(vr);
+        if( !current.isLocal(vr) )
+            current.addLocal(vr);
 
         if( vr.type != exl.type )
             throw new TypeError("Տիպի սխալ։");
@@ -331,7 +334,7 @@ public class Parser {
             throw new ParseError("%s ֆունկցիան սպասում է %d պարամետրեր։",
                     subnam, func.params.size());
 
-        return new Call(func, argus);
+        return new Call(func.name, argus);
     }
 
     //
@@ -478,6 +481,7 @@ public class Parser {
                     throw new ParseError("%s ֆունկցիան սպասում է %d պարամետրեր։",
                             varnam, func.params.size());
                 result = new Apply(func.name, argus);
+                result.type = func.rtype;
             }
             else {
                 Variable var = new Variable(varnam);

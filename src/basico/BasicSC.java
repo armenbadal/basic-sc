@@ -31,7 +31,7 @@ public class BasicSC {
         try {
             Path dir = Paths.get("./cases");
             for( Path nm : Files.newDirectoryStream(dir, "*.bas") ) {
-                if( nm.endsWith("test01.bas") ) {
+                if( nm.endsWith("test02.bas") ) {
                     System.out.printf("~ ~ ~ ~ ~ ~ ~ %s ~ ~ ~ ~ ~ ~ ~\n", nm);
                     BasicSC basic = new BasicSC();
                     basic.compile(nm);
