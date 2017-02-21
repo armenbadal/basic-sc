@@ -13,10 +13,6 @@ public class Let extends Node {
     {
         vari = vr;
         valu = ex;
-
-        // TODO move type check to parser
-        if( vari.type != valu.type )
-            throw new TypeError("Տիպի սխալ։");
     }
     
     @Override
