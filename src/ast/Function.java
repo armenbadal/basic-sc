@@ -12,8 +12,8 @@ import java.util.List;
 
 public class Function {
     public String name = null;
-    public List<Variable> params = null;
     public char rtype = Node.Void;
+    public List<Variable> params = null;
     public Node body = null;
 
     private List<Variable> locals = null;
@@ -22,6 +22,14 @@ public class Function {
     public Function( String nm, List<Variable> prs )
     {
         name = nm;
+        rtype = Node.Real;
+        if( name.endsWith("$") ) {
+            rtype = Node.Text;
+            name = name.substring(0, name.length() - 1);
+        }
+        if( name.equals("Main") )
+            rtype = Node.Void;
+
         params = prs;
 
         locals = new ArrayList<>();

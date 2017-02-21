@@ -19,6 +19,7 @@ public class Let extends Node {
     public void compile( CodeAttr code )
     {
         valu.compile(code);
-        code.emitStore(code.lookup(vari.name));
+        gnu.bytecode.Variable v0 = code.lookup(vari.name);
+        code.emitStore(v0);
     }
 }

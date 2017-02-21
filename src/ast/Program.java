@@ -2,11 +2,11 @@
 package ast;
 
 import gnu.bytecode.*;
-import gnu.bytecode.Variable;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class Program {
     public String name = null;
@@ -66,6 +66,14 @@ public class Program {
             Field sc = classobj.getDeclaredField("scan");
             code.emitPutStatic(sc);
         }
+
+        // կանչել Main ֆունկցիան
+        Optional<Function> optmain = subroutines.stream()
+                .filter(e -> e.name.equals("Main"))
+                .findFirst();
+        if( optmain.isPresent() )
+            code.emitInvokeStatic(classobj.getDeclaredStaticMethod("Main", 0));
+
 
         code.emitReturn();
 
