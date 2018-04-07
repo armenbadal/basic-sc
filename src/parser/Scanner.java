@@ -1,34 +1,30 @@
 package parser;
 
-import java.util.HashMap;
 import java.util.Map;
+import static java.util.Map.entry;
 
 /**/
 public class Scanner {
-    private static Map<String,Token> keywords = null;
-    static {
-        keywords = new HashMap<>();
-        keywords.put("DECLARE", Token.Declare);
-        keywords.put("FUNCTION", Token.Function);
-        keywords.put("END", Token.End);
-        keywords.put("DIM", Token.Dim);
-        keywords.put("AS", Token.As);
-        keywords.put("LET", Token.Let);
-        keywords.put("INPUT", Token.Input);
-        keywords.put("PRINT", Token.Print);
-        keywords.put("IF", Token.If);
-        keywords.put("THEN", Token.Then);
-        keywords.put("ELSEIF", Token.ElseIf);
-        keywords.put("ELSE", Token.Else);
-        keywords.put("FOR", Token.For);
-        keywords.put("TO", Token.To);
-        keywords.put("STEP", Token.Step);
-        keywords.put("WHILE", Token.While);
-        keywords.put("CALL", Token.Call);
-        keywords.put("AND", Token.And);
-        keywords.put("OR", Token.Or);
-        keywords.put("NOT", Token.Not);
-    }
+    private Map<String,Token> keywords = Map.ofEntries(
+            entry("SUB", Token.Subroutine),
+            entry("END", Token.End),
+            entry("LET", Token.Let),
+            entry("INPUT", Token.Input),
+            entry("PRINT", Token.Print),
+            entry("IF", Token.If),
+            entry("THEN", Token.Then),
+            entry("ELSEIF", Token.ElseIf),
+            entry("ELSE", Token.Else),
+            entry("FOR", Token.For),
+            entry("TO", Token.To),
+            entry("STEP", Token.Step),
+            entry("WHILE", Token.While),
+            entry("CALL", Token.Call),
+            entry("MOD", Token.Mod),
+            entry("AND", Token.And),
+            entry("OR", Token.Or),
+            entry("NOT", Token.Not)
+    );
 
     private char[] source = null;
     private int position = 0;
@@ -38,7 +34,7 @@ public class Scanner {
     //
     public Scanner( String text )
     {
-        source = text.toCharArray();
+        source = (text + "@").toCharArray();
     }
 
     //
@@ -47,18 +43,18 @@ public class Scanner {
         char ch = source[position++];
 
         // անտեսել բացատները
-        while( ch == ' ' || ch == '\t' )
+        while( ch == ' ' || ch == '\t' || ch == '\r' )
             ch = source[position++];
 
         // հոսքի ավարտ
         if( position == source.length )
-            return new Lexeme(Token.Eos, line);
+            return new Lexeme(Token.Eof, line);
 
         // մեկնաբանություն
         if( ch == '\'' ) {
-            do
+            do {
                 ch = source[position++];
-            while( ch != '\n' );
+            } while( ch != '\n' );
             --position;
 
             return next();
@@ -102,7 +98,7 @@ public class Scanner {
             return new Lexeme(Token.Lt, "<", line);
         }
 
-        Token kind = Token.Unknown;
+        Token kind = Token.None;
         switch( ch ) {
             case '=':
                 kind = Token.Eq;
@@ -120,19 +116,19 @@ public class Scanner {
                 kind = Token.Div;
                 break;
             case '^':
-                kind = Token.Power;
+                kind = Token.Pow;
                 break;
             case '(':
-                kind = Token.LeftParen;
+                kind = Token.LeftPar;
                 break;
             case ')':
-                kind = Token.RightParen;
+                kind = Token.RightPar;
                 break;
             case ',':
                 kind = Token.Comma;
                 break;
             case '&':
-                kind = Token.Concat;
+                kind = Token.Amp;
                 break;
         }
 

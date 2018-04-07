@@ -9,7 +9,8 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
+import static java.util.Map.entry;
 
 /**/
 public class Parser {
@@ -20,10 +21,31 @@ public class Parser {
 
     // վերլուծվող ֆայլի անունը
     private Path pathToFile = null;
-    // հայտարարված ու սահմանված ենթածրագրերը
-    private List<Function> subroutines = null;
+    // վերլուծվող ծրագիր
+    private Program program = null;
     // վերլուծվող ենթածրագրի հղումը
-    private Function current = null;
+    private Subroutine current = null;
+
+    // operations
+    private Map<Token,Operation> opcodes = Map.ofEntries(
+            entry(Token.Add, Operation.Add),
+            entry(Token.Sub, Operation.Sub),
+            entry(Token.Amp, Operation.Conc),
+            entry(Token.Mul, Operation.Mul),
+            entry(Token.Div, Operation.Div),
+            entry(Token.Mod, Operation.Mod),
+            entry(Token.Pow, Operation.Pow),
+            entry(Token.Eq, Operation.Eq),
+            entry(Token.Ne, Operation.Ne),
+            entry(Token.Gt, Operation.Gt),
+            entry(Token.Ge, Operation.Ge),
+            entry(Token.Lt, Operation.Lt),
+            entry(Token.Le, Operation.Le),
+            entry(Token.And, Operation.And),
+            entry(Token.Or, Operation.Or));
+
+    //
+    private Map<String,List<Apply>> unresolved = null;
 
     //
     public Parser( Path path ) throws IOException
@@ -34,226 +56,180 @@ public class Parser {
         try( BufferedReader read = new BufferedReader(new FileReader(pathToFile.toFile())) ) {
             read.lines().forEach(e -> texter.append(e).append("\n"));
         }
-        texter.append('@');
 
         scan = new Scanner(texter.toString());
+    }
+
+    //
+    public Program parse() throws ParseError
+    {
+        return parseProgram();
+    }
+
+    //
+    private Program parseProgram() throws ParseError
+    {
+        program = new Program(pathToFile.toString());
+
         lookahead = scan.next();
+
         // բաց թողնել ֆայլի սկզբի դատարկ տողերը
         while( lookahead.is(Token.NewLine) )
             lookahead = scan.next();
-    }
 
-    //
-    public Program parse() throws ParseError, TypeError
-    {
-        subroutines = new ArrayList<>();
-
-        while( lookahead.is(Token.Declare, Token.Function) ) {
-            Function subri = null;
-            if( lookahead.is(Token.Declare) )
-                subri = parseDeclare();
-            else if( lookahead.is(Token.Function) )
-                subri = parseFunction();
-
-            if( subri != null ) {
-                if( !subroutines.contains(subri) )
-                    subroutines.add(subri);
-            }
+        while( !lookahead.is(Token.Eof) ) {
+            parseSubroutine();
+            parseNewLines();
         }
 
-        String outname = pathToFile.getFileName().toString();
-        Program result = new Program(outname.replace(".bas", ""));
-        subroutines.forEach(result::add);
-        return result;
+        return program;
     }
 
     //
-    private Function parseDeclare() throws ParseError, TypeError
+    private void parseSubroutine() throws ParseError
     {
-        match(Token.Declare);
-        return parseFuncHeader();
-    }
-
-    //
-    private Function parseFuncHeader() throws ParseError, TypeError
-    {
-        match(Token.Function);
+        // վերլուծել վերնագիրը
+        match(Token.Subroutine);
         String name = lookahead.value;
         match(Token.Identifier);
 
-        // ստուգել ֆունկցիայի՝ դեռևս սահմանված չլինելը
-        for( Function si : subroutines )
-            if( si.name.equals(name) && si.body != null )
-                throw new ParseError(name + " անունով ֆունկցիան արդեն սահմանված է։");
+//        // ստուգել ֆունկցիայի՝ դեռևս սահմանված չլինելը
+//        for( Subroutine si : subroutines )
+//            if( si.name.equals(name) && si.body != null )
+//                throw new ParseError(name + " անունով ֆունկցիան արդեն սահմանված է։");
 
-        match(Token.LeftParen);
         List<Variable> params = new ArrayList<>();
-        if( lookahead.is(Token.Identifier) ) {
-            Variable varl = new Variable(lookahead.value);
-            match(Token.Identifier);
-            if( params.contains(varl) )
-                throw new ParseError(varl + " անունն արդեն կա պարամետրերի ցուցակում։");
-            params.add(varl);
-            while( lookahead.is(Token.Comma) ) {
-                match(Token.Comma);
-                varl = new Variable(lookahead.value);
-                match(Token.Identifier);
-                params.add(varl);
+        if( lookahead.is(Token.LeftPar) ) {
+            match(Token.LeftPar);
+            if( lookahead.is(Token.Identifier) ) {
+                String nm = match(Token.Identifier);
+//                if( params.contains(nm) )
+//                    throw new ParseError(varl + " անունն արդեն կա պարամետրերի ցուցակում։");
+                params.add(new Variable(nm));
+                while( lookahead.is(Token.Comma) ) {
+                    match(Token.Comma);
+                    nm = match(Token.Identifier);
+                    params.add(new Variable(nm));
+                }
             }
+            match(Token.RightPar);
         }
-        match(Token.RightParen);
-        parseNewLines();
 
-        current = new Function(name, params);
-        return current;
-    }
+        current = new Subroutine(name, params);
+        program.subroutines.add(current);
 
-    //
-    private Function parseFunction() throws ParseError, TypeError
-    {
-        // վերլուծել վերնագիրը
-        Function subr = parseFuncHeader();
+//        // ենթածրագիր ցուցիչը
+//        Optional<Subroutine> optsub = program.subroutines.stream()
+//                .filter(e -> e.name.equals(name))
+//                .findFirst();
+//        if( optsub.isPresent() ) {
+//            subr = optsub.get();
+//            current = subr;
+//        }
+//        else
+//            subroutines.add(subr);
 
-        // ենթածրագիր ցուցիչը
-        final String name = subr.name;
-        Optional<Function> optsub = subroutines.stream()
-                .filter(e -> e.name.equals(name))
-                .findFirst();
-        if( optsub.isPresent() ) {
-            subr = optsub.get();
-            current = subr;
-        }
-        else
-            subroutines.add(subr);
+        current.body = parseStatements();
 
-        subr.body = parseNodeList();
         match(Token.End);
-        match(Token.Function);
+        match(Token.Subroutine);
+    }
+
+    //
+    private Sequence parseStatements() throws ParseError
+    {
         parseNewLines();
 
-        return subr;
-    }
-
-    //
-    private Node parseNodeList() throws ParseError, TypeError
-    {
-        Sequence seq = new Sequence();
-        // FIRST(Node)
-        while( lookahead.is(Token.Identifier, Token.Input, Token.Print,
-                Token.If, Token.For, Token.While, Token.Call, Token.Let) ) {
-            Node sti = parseNode();
-            seq.add(sti);
-        }
-
-        return seq;
-    }
-
-    //
-    private Node parseNode() throws ParseError, TypeError
-    {
-        Node stat = null;
-        switch( lookahead.kind ) {
-            case Let:
-            case Identifier:
+        Sequence sequ = new Sequence();
+        while( true ) {
+            Statement stat = null;
+            int line = lookahead.line;
+            if( lookahead.is(Token.Let) )
                 stat = parseLet();
-                break;
-            case Input:
+            else if( lookahead.is(Token.Input) )
                 stat = parseInput();
-                break;
-            case Print:
+            else if( lookahead.is(Token.Print) )
                 stat = parsePrint();
+            else if( lookahead.is(Token.If) )
+                stat = parseIf();
+            else if( lookahead.is(Token.While) )
+                stat = parseWhile();
+            else if( lookahead.is(Token.For) )
+                stat = parseFor();
+            else if( lookahead.is(Token.Call) )
+                stat = parseCall();
+            else
                 break;
-            case If:
-                stat = parseConditional();
-                break;
-            case For:
-                stat = parseForLoop();
-                break;
-            case While:
-                stat = parseWhileLoop();
-                break;
-            case Call:
-                stat = parseCallSub();
-                break;
+            stat.line = line;
+            sequ.statements.add(stat);
+            parseNewLines();
         }
-        parseNewLines();
 
-        return stat;
+        return sequ;
     }
 
     //
-    private Node parseLet() throws ParseError, TypeError
+    private Let parseLet() throws ParseError
     {
-        if( lookahead.is(Token.Let) )
-            match(Token.Let);
-        String varn = lookahead.value;
-        match(Token.Identifier);
+        match(Token.Let);
+        String varn = match(Token.Identifier);
         match(Token.Eq);
-        Node exl = parseDisjunction();
+        Expression exl = parseExpression();
 
-        // ստուգել, թե արդյոք վերագրվող փոփոխականը ֆունկցիայի անունն է
-        if( current.name.equals(varn) ) {
-            current.rtype = exl.type; // որոշել ֆունկցիայի վերադարձրած արժեքի տիպը
-            varn = "result$" + varn;
-        }
+        Variable vr = getVariable(varn, false);
 
-        Variable vr = new Variable(varn);
-        if( !current.isLocal(vr) )
-            current.addLocal(vr);
-
-        if( vr.type != exl.type )
-            throw new TypeError("Տիպի սխալ։");
+        if( varn.equals(current.name) )
+            current.hasValue = true;
 
         return new Let(vr, exl);
     }
 
     //
-    private Node parseInput() throws ParseError, TypeError
+    private Input parseInput() throws ParseError
     {
         match(Token.Input);
-        String varn = lookahead.value;
-        match(Token.Identifier);
+        String pr = "?";
+        if( lookahead.is(Token.Text) ) {
+            pr = match(Token.Text);
+            match(Token.Comma);
+        }
+        String varn = match(Token.Identifier);
 
-        Variable vr = new Variable(varn);
-        current.addLocal(vr);
+        Variable vr = getVariable(varn, false);
 
-        return new Input(vr);
+        return new Input(pr, vr);
     }
 
     //
-    private Node parsePrint() throws ParseError, TypeError
+    private Print parsePrint() throws ParseError
     {
         match(Token.Print);
-        Node exo = parseDisjunction();
+        Expression exo = parseExpression();
 
         return new Print(exo);
     }
 
     //
-    private Node parseConditional() throws ParseError, TypeError
+    private If parseIf() throws ParseError
     {
         match(Token.If);
-        Node cond = parseDisjunction();
+        Expression cond = parseExpression();
         match(Token.Then);
-        parseNewLines();
-        Node thenp = parseNodeList();
+        Sequence thenp = parseStatements();
         If statbr = new If(cond, thenp);
         If bi = statbr;
         while( lookahead.is(Token.ElseIf) ) {
             match(Token.ElseIf);
-            Node coe = parseDisjunction();
+            Expression coe = parseExpression();
             match(Token.Then);
-            parseNewLines();
-            Node ste = parseNodeList();
+            Sequence ste = parseStatements();
             If bre = new If(coe, ste);
-            bi.setElse(bre);
+            bi.alternative = bre;
             bi = bre;
         }
         if( lookahead.is(Token.Else) ) {
             match(Token.Else);
-            parseNewLines();
-            Node bre = parseNodeList();
-            bi.setElse(bre);
+            bi.alternative = parseStatements();
         }
         match(Token.End);
         match(Token.If);
@@ -261,260 +237,280 @@ public class Parser {
         return statbr;
     }
 
-    private Node parseForLoop() throws ParseError, TypeError
+    //
+    private For parseFor() throws ParseError
     {
         match(Token.For);
 
         Variable prn = new Variable(lookahead.value);
-        match(Token.Identifier);
-        if( 'T' == prn.type )
-            throw new ParseError("FOR ցիկլի պարամետրը պետք է լինի թվային։");
-        current.addLocal(prn);
+        String par = match(Token.Identifier);
         match(Token.Eq);
-        Node init = parseDisjunction();
-
+        Expression be = parseExpression();
         match(Token.To);
-        Node lim = parseDisjunction();
-
-        Node ste = null;
+        Expression en = parseExpression();
+        double spvl = 1.0;
         if( lookahead.is(Token.Step) ) {
             match(Token.Step);
-            ste = parseDisjunction();
+            boolean neg = false;
+            if( lookahead.is(Token.Sub) ) {
+                match(Token.Sub);
+                neg = true;
+            }
+            String num = match(Token.Number);
+            spvl = Double.parseDouble(num);
+            if( neg )
+                spvl = -spvl;
         }
-        parseNewLines();
-
-        Node bdy = parseNodeList();
-
+        Real sp = new Real(spvl);
+        Variable vp = getVariable(par, false);
+        Statement dy = parseStatements();
         match(Token.End);
         match(Token.For);
 
-        return new For(prn, init, lim, ste, bdy);
+        return new For(vp, be, en, sp, dy);
     }
 
-    private Node parseWhileLoop() throws ParseError, TypeError
+    //
+    private While parseWhile() throws ParseError
     {
         match(Token.While);
-        Node cond = parseDisjunction();
-        parseNewLines();
-        Node bdy = parseNodeList();
+        Expression cond = parseExpression();
+        Statement body = parseStatements();
         match(Token.End);
         match(Token.While);
 
-        return new While(cond, bdy);
+        return new While(cond, body);
     }
 
     //
-    private Node parseCallSub() throws ParseError, TypeError
+    private Call parseCall() throws ParseError
     {
         match(Token.Call);
-        String subnam = lookahead.value;
-        match(Token.Identifier);
-
-        // ստուգել ֆունկցիայի սահմանված կամ հայտարարված լինելը
-        Optional<Function> optfunc = subroutines.stream()
-                .filter(e -> e.name.equals(subnam))
-                .findFirst();
-        if( !optfunc.isPresent() )
-            throw new ParseError("Կանչվող պրոցեդուրան սահմանված կամ հայտարարված չէ։");
+        String name = match(Token.Identifier);
 
         // արգումենտները
-        ArrayList<Node> argus = new ArrayList<>();
-        if( lookahead.is(Token.Number, Token.Identifier, Token.Sub, Token.Not, Token.LeftParen) ) {
-            Node exi = parseDisjunction();
-            argus.add(exi);
+        ArrayList<Expression> args = new ArrayList<>();
+        if( lookahead.is(Token.Number, Token.Text, Token.Identifier, Token.Sub, Token.Not, Token.LeftPar) ) {
+            Expression exi = parseExpression();
+            args.add(exi);
             while( lookahead.is(Token.Comma) ) {
-                lookahead = scan.next();
-                exi = parseDisjunction();
-                argus.add(exi);
+                match(Token.Comma);
+                exi = parseExpression();
+                args.add(exi);
             }
         }
 
-        Function func = optfunc.get();
-        if( func.params.size() != argus.size() )
-            throw new ParseError("%s ֆունկցիան սպասում է %d պարամետրեր։",
-                    subnam, func.params.size());
+        Call caller = new Call(null, args);
+        Subroutine callee = getSubroutine(name);
 
-        return new Call(func.name, argus);
+        if( null == callee )
+            unresolved.get(name).add(caller.subrcall);
+
+        caller.subrcall.callee = callee;
+
+        return caller;
     }
 
     //
-    private void parseNewLines() throws ParseError, TypeError
+    private void parseNewLines() throws ParseError
     {
         match(Token.NewLine);
         while( lookahead.is(Token.NewLine) )
             lookahead = scan.next();
     }
 
-    private Node parseDisjunction() throws ParseError, TypeError
+
+    /*
+    * Expression = Addition [('=' | '<>' | '>' | '>=' | '<' | '<=') Addition].
+    */
+    private Expression parseExpression() throws ParseError
     {
-        Node exo = parseConjunction();
-        while( lookahead.is(Token.Or) ) {
-            lookahead = scan.next();
-            Node exi = parseConjunction();
-            return new Logical("OR", exo, exi);
+        Expression exo = parseAddition();
+        if( lookahead.is(Token.Eq, Token.Ne, Token.Gt, Token.Ge, Token.Lt, Token.Le) ) {
+            Token optok = lookahead.kind;
+            match(lookahead.kind);
+            Expression exi = parseAddition();
+            exo = new Binary(opcodes.get(optok), exo, exi);
         }
         return exo;
     }
 
-    private Node parseConjunction() throws ParseError, TypeError
+    /*
+    * Addition = Multiplication {('+' | '-' | '&' | 'OR') Multiplication}.
+    */
+    private Expression parseAddition() throws ParseError
     {
-        Node exo = parseEquality();
-        while( lookahead.is(Token.And) ) {
-            lookahead = scan.next();
-            Node exi = parseEquality();
-            return new Logical("AND", exo, exi);
+        Expression exo = parseMultiplication();
+        while( lookahead.is(Token.Add, Token.Sub, Token.Amp, Token.Or) ) {
+            Token optok = lookahead.kind;
+            match(lookahead.kind);
+            Expression exi = parseMultiplication();
+            exo = new Binary(opcodes.get(optok), exo, exi);
         }
         return exo;
     }
 
-    private Node parseEquality() throws ParseError, TypeError
+    /*
+    * Multiplication = Power {('*' | '/' | '\' | 'AND') Power}.
+    */
+    private Expression parseMultiplication() throws ParseError
     {
-        Node exo = parseComparison();
-        if( lookahead.is(Token.Eq, Token.Ne) ) {
-            String oper = lookahead.value;
-            lookahead = scan.next();
-            Node exi = parseComparison();
-            if( exo.type != exi.type )
-                throw new TypeError("Տիպի սխալ։");
-            exo = new Comparison(oper, exo, exi);
+        Expression exo = parsePower();
+        while( lookahead.is(Token.Mul, Token.Div, Token.Mod, Token.And) ) {
+            Token optok = lookahead.kind;
+            match(lookahead.kind);
+            Expression exi = parsePower();
+            exo = new Binary(opcodes.get(optok), exo, exi);
         }
         return exo;
     }
 
-    private Node parseComparison() throws ParseError, TypeError
+    /*
+    * Power = Factor ['^' Power].
+    */
+    private Expression parsePower() throws ParseError
     {
-        Node exo = parseAddition();
-        if( lookahead.is(Token.Gt, Token.Ge, Token.Lt, Token.Le) ) {
-            String oper = lookahead.value;
-            lookahead = scan.next();
-            Node exi = parseAddition();
-            if( exo.type != Node.Real || exi.type != Node.Real )
-                throw new TypeError("Տիպի սխալ։");
-            exo = new Comparison(oper, exo, exi);
+        Expression exo = parseFactor();
+        if( lookahead.is(Token.Pow) ) {
+            match(Token.Pow);
+            Expression exi = parsePower();
+            exo = new Binary(Operation.Pow, exo, exi);
         }
         return exo;
     }
 
-    private Node parseAddition() throws ParseError, TypeError
+    /**/
+    private Expression parseFactor() throws ParseError
     {
-        Node exo = parseMultiplication();
-        while( lookahead.is(Token.Add, Token.Sub) ) {
-            String oper = lookahead.value;
-            lookahead = scan.next();
-            Node exi = parseMultiplication();
-            if( exo.type != Node.Real || exi.type != Node.Real )
-                throw new TypeError("Տիպի սխալ։");
-            exo = new Arithmetic(oper, exo, exi);
-        }
-        return exo;
-    }
-
-    private Node parseMultiplication() throws ParseError, TypeError
-    {
-        Node exo = parsePower();
-        while( lookahead.is(Token.Mul, Token.Div) ) {
-            String oper = lookahead.value;
-            lookahead = scan.next();
-            Node exi = parsePower();
-            if( exo.type != Node.Real || exi.type != Node.Real )
-                throw new TypeError("Տիպի սխալ։");
-            exo = new Arithmetic(oper, exo, exi);
-        }
-        return exo;
-    }
-
-    private Node parsePower() throws ParseError, TypeError
-    {
-        Node exo = parseFactor();
-        if( lookahead.is(Token.Power) ) {
-            match(Token.Power);
-            Node exi = parsePower();
-            if( exo.type != Node.Real || exi.type != Node.Real )
-                throw new TypeError("Տիպի սխալ։");
-            exo = new Arithmetic("^", exo, exi);
-        }
-        return exo;
-    }
-
-    private Node parseFactor() throws ParseError, TypeError
-    {
-        Node result = null;
+        // NUMBER
         if( lookahead.is(Token.Number) ) {
-            double numval = Double.valueOf(lookahead.value);
-            lookahead = scan.next();
-            result = new Real(numval);
-        }
-        else if( lookahead.is(Token.Text) ) {
-            String textval = lookahead.value;
-            lookahead = scan.next();
-            result = new Text(textval);
-        }
-        else if( lookahead.is(Token.Identifier) ) {
-            String varnam = lookahead.value;
-            lookahead = scan.next();
-            if( lookahead.is(Token.LeftParen) ) {
-                ArrayList<Node> argus = new ArrayList<>();
-                match(Token.LeftParen);
-                // FIRST(Disjunction)
-                if( lookahead.is(Token.Number, Token.Identifier, Token.Sub, Token.Not, Token.LeftParen) ) {
-                    Node exi = parseDisjunction();
-                    argus.add(exi);
-                    while( lookahead.is(Token.Comma) ) {
-                        lookahead = scan.next();
-                        exi = parseDisjunction();
-                        argus.add(exi);
-                    }
-                }
-                match(Token.RightParen);
-                // ստուգել ներդրված ֆունկցիա լինելը
-                if( BuiltIn.is(varnam) )
-                    return new BuiltIn(varnam, argus);
-                // գտնել հայտարարված կամ սահմանված ֆունկցիան
-                Optional<Function> optfunc = subroutines.stream()
-                        .filter(e -> e.name.equals(varnam))
-                        .findFirst();
-                if( !optfunc.isPresent() )
-                    new ParseError("Կանչված ֆունցկիան սահմանված կամ հայտարարված չէ։");
-                Function func = optfunc.get();
-                // համեմատել ֆունկցիայի պարամետրերի և փոխանցված արգումենտների քանակը
-                if( func.params.size() != argus.size() )
-                    throw new ParseError("%s ֆունկցիան սպասում է %d պարամետրեր։",
-                            varnam, func.params.size());
-                result = new Apply(func.name, argus);
-                result.type = func.rtype;
-            }
-            else {
-                Variable var = new Variable(varnam);
-                if( !current.isParameter(var) && !current.isLocal(var) )
-                    throw new ParseError("`%s` փոփոխականն արժեքավորված չէ։", var.name);
-                return var;
-            }
-        }
-        else if( lookahead.is(Token.Sub, Token.Not) ) {
-            String oper = lookahead.value;
-            lookahead = scan.next();
-            Node subex = parseFactor();
-            if( oper.equals("NOT") && subex.type != Node.Boolean )
-                throw new TypeError("Տիպի սխալ։");
-            if( oper.equals("-") && subex.type != Node.Real )
-                throw new TypeError("Տիպի սխալ։");
-            result = new Unary(oper, subex);
-        }
-        else if( lookahead.is(Token.LeftParen) ) {
-            match(Token.LeftParen);
-            result = parseDisjunction();
-            match(Token.RightParen);
+            String lex = match(Token.Number);
+            return new Real(Double.parseDouble(lex));
         }
 
-        return result;
+        // TEXT
+        if( lookahead.is(Token.Text) ) {
+            String lex = match(Token.Text);
+            return new Text(lex);
+        }
+
+        // ('-' | 'NOT') Factor
+        if( lookahead.is(Token.Sub, Token.Not) ) {
+            Operation opc = Operation.None;
+            if( lookahead.is(Token.Sub) ) {
+                opc = Operation.Sub;
+                match(Token.Sub);
+            }
+            else if( lookahead.is(Token.Not) ) {
+                opc = Operation.Not;
+                match(Token.Not);
+            }
+            Expression exo = parseFactor();
+            return new Unary(opc, exo);
+        }
+
+        // IDENT ['(' [ExpressionList] ')']
+        if( lookahead.is(Token.Identifier) ) {
+            String name = match(Token.Identifier);
+            if( lookahead.is(Token.LeftPar) ) {
+                ArrayList<Expression> args = new ArrayList<>();
+                match(Token.LeftPar);
+                Expression exo = parseExpression();
+                args.add(exo);
+                while( lookahead.is(Token.Comma) ) {
+                    match(Token.Comma);
+                    exo = parseExpression();
+                    args.add(exo);
+                }
+                match(Token.RightPar);
+
+                Apply applyer = new Apply(null, args);
+                applyer.type = Type.typeOf(name);
+
+                Subroutine callee = getSubroutine(name);
+                if( null == callee )
+                    unresolved.get(name).add(applyer);
+
+                applyer.callee = callee;
+
+                return applyer;
+            }
+            // ստուգել, որ name անունով փոփոխական սահմանված լինի
+            return getVariable(name, true);
+        }
+
+        // '(' Expression ')'
+        if( lookahead.is(Token.LeftPar) ) {
+            match(Token.LeftPar);
+            Expression exo = parseExpression();
+            match(Token.RightPar);
+            return exo;
+        }
+
+        throw new ParseError("Սպասվում է NUMBER, TEXT, '-', NOT, IDENT կամ '(', բայց հանդիպել է " + lookahead.value + "։");
     }
 
-    private void match( Token exp ) throws ParseError
+//    private String match( Token... exps ) throws ParseError
+//    {
+//        if( !lookahead.is(exps) )
+//            throw new ParseError("Շարահյուսական սխալ։ %d տողում սպասվում էր %s, բայց հանդիպել է %s",
+//                    lookahead.line, exps[0], lookahead.kind); // TODO: ուղղել
+//
+//        String valu = lookahead.value;
+//        lookahead = scan.next();
+//        return valu;
+//    }
+
+    /**/
+    private String match( Token exp ) throws ParseError
     {
-        if( lookahead.is(exp) )
-            lookahead = scan.next();
-        else
-            throw new ParseError("Շարահյուսական սխալ։ %d տողում սպասվում էր %s, բայց հանդիպել է %s",
-                    lookahead.line, exp, lookahead.kind);
+        if( !lookahead.is(exp) )
+            throw new ParseError("Շարահյուսական սխալ։ %d տողում սպասվում էր %s, բայց հանդիպել է %s (%s)",
+                    lookahead.line, exp, lookahead.kind, lookahead.value);
+
+        String valu = lookahead.value;
+        lookahead = scan.next();
+        return valu;
+    }
+
+    /**/
+    private Variable getVariable( String nm, boolean rval ) throws ParseError
+    {
+        if( rval && nm.equals(current.name) )
+            throw new ParseError("Subroutine name is used as a variable.");
+
+        for( Variable vi : current.locals )
+            if( nm.equals(vi.name) )
+                return vi;
+
+        if( rval )
+            throw new ParseError("Variable `" + nm + "` is not defined.");
+
+        Variable varp = new Variable(nm);
+        current.locals.add(varp);
+
+        return varp;
+    }
+
+    /**/
+    private Subroutine getSubroutine( String nm )
+    {
+        // որոնել տրված անունով ենթածրագիրը արդեն սահմանվածների մեջ
+        for( Subroutine si : program.subroutines )
+            if( nm.equals(si.name) )
+                return si;
+
+//        // որոնել
+//        for( auto& bi : builtins )
+//        if( std.get<0>(bi) == nm ) {
+//            // հայտարարել ներդրված ենթածրագիր
+//            auto sre = std.make_shared<Subroutine>(std.get<0>(bi), std.get<1>(bi));
+//            sre->isBuiltIn = true;
+//            sre->hasValue = std.get<2>(bi);
+//            module->members.push_back(sre);
+//            return sre;
+//        }
+
+        return null;
     }
 }

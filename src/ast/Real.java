@@ -1,20 +1,12 @@
 
 package ast;
 
-import gnu.bytecode.CodeAttr;
-
-public class Real extends Node {
+public class Real extends Expression {
     public double value = 0D;
     
     public Real( double vl )
     {
-        type = Node.Real;
+        type = Type.Real;
         value = vl;
-    }
-
-    @Override
-    public void compile( CodeAttr code ) 
-    {
-        code.emitPushDouble(value);
     }
 }

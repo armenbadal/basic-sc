@@ -2,9 +2,9 @@
 package basico;
 
 import ast.Program;
+import generator.Lisper;
 import parser.ParseError;
 import parser.Parser;
-import parser.TypeError;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -18,7 +18,7 @@ public class BasicSC {
         try {
             Parser parser = new Parser(path);
             Program prog = parser.parse();
-            prog.compile();
+            (new Lisper(System.out)).asLisp(prog);
         }
         catch( Exception ex ) {
             System.err.println(ex.getMessage());
@@ -26,12 +26,12 @@ public class BasicSC {
         return true;
     }
 
-    private static void runTests()
+    private static void runTests( boolean all )
     {
         try {
             Path dir = Paths.get("./cases");
             for( Path nm : Files.newDirectoryStream(dir, "*.bas") ) {
-                if( nm.endsWith("test02.bas") ) {
+                if( all || nm.endsWith("test00.bas") ) {
                     System.out.printf("~ ~ ~ ~ ~ ~ ~ %s ~ ~ ~ ~ ~ ~ ~\n", nm);
                     BasicSC basic = new BasicSC();
                     basic.compile(nm);
@@ -43,9 +43,9 @@ public class BasicSC {
         }
     }
 
-    public static void main( String[] args ) throws IOException, TypeError, ParseError
+    public static void main( String[] args ) throws IOException, ParseError
     {
         BasicSC basic = new BasicSC();
-        basic.runTests();
+        basic.runTests(false);
     }
 }

@@ -1,32 +1,22 @@
 
 package ast;
 
-import gnu.bytecode.CodeAttr;
-
-public class For extends Node {
+/**
+ * Պարամետրով ցիկլ
+ */
+public class For extends Statement {
     public Variable param = null;
-    public Node init = null;
-    public Node bound = null;
-    public Node step = null;
-    public Node body = null;
+    public Expression init = null;
+    public Expression bound = null;
+    public Real step = null;
+    public Statement body = null;
 
-    public For( Variable pr, Node ini, Node bou, Node sp, Node bo )
+    public For( Variable pr, Expression ini, Expression bou, Real sp, Statement bo )
     {
         param = pr;
         init = ini;
         bound = bou;
         step = sp;
         body = bo;
-    }
-    
-    @Override
-    public void compile( CodeAttr code )
-    {
-        // param = eval(init)
-        // spval = eval(step)
-        // boval = eval(bound)
-        // while( param <> boval )
-        //    exec(body)
-        //    param = param + spval;
     }
 }

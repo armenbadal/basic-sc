@@ -2,7 +2,7 @@ package parser;
 
 /**/
 public class Lexeme {
-    public Token kind = Token.Unknown;
+    public Token kind = Token.None;
     public String value = null;
     public int line = 0;
 

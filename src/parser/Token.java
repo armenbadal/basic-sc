@@ -1,54 +1,52 @@
+
 package parser;
 
 /**/
 public enum Token {
-    Unknown,
-    Number,
-    Text,
-    Identifier,
+    None, // ոչինչ
 
-    Declare,
-    Function,
-    End,
-    Dim,
-    As,
-    Let,
-    Input,
-    Print,
-    If,
-    Then,
-    ElseIf,
-    Else,
-    For,
-    To,
-    Step,
-    While,
-    Call,
+    Number,     // թվային հաստատուն
+    Text,       // տեքստային հաստատուն
+    Identifier, // իդենտիֆիկատոր
 
-    LeftParen,
-    RightParen,
-    Comma,
+    Subroutine, // SUB
+    Input,      // INPUT
+    Print,      // PRINT
+    Let,        // LET
+    If,         // IF
+    Then,       // THEN
+    ElseIf,     // ELSEIF
+    Else,       // ELSE
+    While,      // WHILE
+    For,        // FOR
+    To,         // TO
+    Step,       // STEP
+    Call,       // CALL
+    End,        // END
 
-    Or,
-    And,
-    Not,
+    NewLine, // նոր տողի նիշ
 
-    Eq,
-    Ne,
+    Eq, // =
+    Ne, // <>
+    Lt, // <
+    Le, // <=
+    Gt, // >
+    Ge, // >=
 
-    Gt,
-    Ge,
-    Lt,
-    Le,
+    LeftPar,  // (
+    RightPar, // )
+    Comma,    // ,
 
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Power,
-    Concat,
+    Add, // +
+    Sub, // -
+    Amp, // &
+    Or,  // OR
+    Mul, // *
+    Div, // /
+    Mod, // MOD
+    And, // AND
+    Pow, // ^
+    Not, // NOT
 
-    NewLine,
-
-    Eos
+    Eof // ֆայլի վերջը
 }

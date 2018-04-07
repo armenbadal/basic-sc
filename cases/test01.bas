@@ -1,6 +1,6 @@
 
 ' Greatest common divisor
-FUNCTION Gcd(n, m)
+SUB Gcd(n, m)
   WHILE n <> m
     IF n > m THEN
       n = n - m
@@ -9,11 +9,11 @@ FUNCTION Gcd(n, m)
     END IF
   END WHILE
   Gcd = n
-END FUNCTION
+END SUB
 
-FUNCTION Main()
+SUB Main()
   PRINT Gcd(23, 12)
   PRINT Gcd(15, 45)
   PRINT Gcd(3, 21)
-END FUNCTION
+END SUB
 
